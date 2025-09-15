@@ -1,0 +1,28 @@
+services:
+  neo4j:
+    image: neo4j:4.4
+    container_name: neo4j_db
+    restart: always
+    environment:
+      NEO4J_AUTH: "neo4j/supersecurepassword"
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+  andres-202010495:
+    build: ./backend
+    container_name: andres-202010495
+    restart: always
+    depends_on:
+      - neo4j
+    env_file:
+      - .env
+    ports:
+      - "${EXPRESS_PORT:-3000}:3000"
+
+volumes:
+  neo4j_data:
+    driver: local
+
