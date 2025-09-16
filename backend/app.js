@@ -1,65 +1,54 @@
-import express from "express";
-import bodyParser from "body-parser";
-import neo4j from "neo4j-driver";
-import dotenv from "dotenv";
-
-dotenv.config();
+require("dotenv").config();
+const express = require("express");
+const neo4j = require("neo4j-driver");
 
 const app = express();
-app.use(bodyParser.json());
+const PORT = process.env.EXPRESS_PORT || 3000;
 
-// 🔹 Conexión a Neo4j
+app.use(express.json());
+
+// Conectar a Neo4j
 const driver = neo4j.driver(
-  "bolt://neo4j_db:7687",
-  neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD)
+  process.env.NEO4J_URI,
+  neo4j.auth.basic(process.env.NEO4J_USER, process.env.NEO4J_PASSWORD),
+  { encrypted: 'ENCRYPTION_OFF' }
 );
 
-
-// ✅ Endpoint raíz
-app.get("/", (req, res) => {
-  res.send("API de Artwork corriendo 🚀");
-});
-
-// ✅ GET -> listar artworks
+// GET -> obtener 10 artworks
 app.get("/artworks", async (req, res) => {
   const session = driver.session();
   try {
-    const result = await session.run("MATCH (a:Artwork) RETURN a LIMIT 20");
+    const result = await session.run("MATCH (a:Artwork) RETURN a LIMIT 10");
     const artworks = result.records.map(r => r.get("a").properties);
     res.json(artworks);
-  } catch (error) {
-    console.error("Error en GET /artworks:", error);
-    res.status(500).json({ error: "Error obteniendo artworks" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   } finally {
     await session.close();
   }
 });
 
-// ✅ POST -> crear un nuevo artwork
+// POST -> crear un registro de prueba
 app.post("/artworks", async (req, res) => {
-  const { id, titulo, anio } = req.body;
-
-  if (!id || !titulo) {
-    return res.status(400).json({ error: "Faltan campos obligatorios: id y titulo" });
-  }
-
   const session = driver.session();
   try {
+    const randomId = Math.floor(Math.random() * 100000).toString();
     await session.run(
-      "CREATE (:Artwork {id:$id, titulo:$titulo, anio:$anio})",
-      { id, titulo, anio: anio ? parseInt(anio) : null }
+      "CREATE (a:Artwork {id: $id, title: $title, year: $year}) RETURN a",
+      {
+        id: randomId,
+        title: req.body.title || "Obra Aleatoria",
+        year: req.body.year || 2025,
+      }
     );
-    res.json({ msg: "Nuevo Artwork creado ✅" });
-  } catch (error) {
-    console.error("Error en POST /artworks:", error);
-    res.status(500).json({ error: "Error creando artwork" });
+    res.json({ message: "Registro creado", id: randomId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   } finally {
     await session.close();
   }
 });
 
-// 🔹 Inicializar servidor
-const PORT = process.env.EXPRESS_PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
